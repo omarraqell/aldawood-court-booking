@@ -1,0 +1,7 @@
+import { PoliciesPanel } from "@/features/policies/policies-panel";
+
+export const dynamic = "force-dynamic";
+
+export default function PoliciesPage() {
+  return <PoliciesPanel />;
+}

@@ -1,0 +1,335 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CourtType {
+  V5  @map("5v5")
+  V7  @map("7v7")
+  V11 @map("11v11")
+}
+
+enum SurfaceType {
+  artificial_grass
+  natural_grass
+}
+
+enum CustomerSegment {
+  new
+  occasional
+  regular
+  vip
+}
+
+enum Language {
+  ar
+  en
+}
+
+enum BookingType {
+  regular
+  birthday
+  private_event
+}
+
+enum BookingStatus {
+  confirmed
+  cancelled
+  completed
+  no_show
+}
+
+enum EventType {
+  birthday
+  corporate
+  tournament
+  private_event
+}
+
+enum Channel {
+  web_test
+  whatsapp
+  voice
+}
+
+enum ConversationStatus {
+  active
+  waiting_customer
+  waiting_system
+  completed
+  abandoned
+}
+
+enum Intent {
+  booking
+  cancellation
+  inquiry
+  general_inquiry
+  event
+  modification
+  unknown
+}
+
+enum AdminRole {
+  owner
+  manager
+  staff
+}
+
+enum BookingSource {
+  agent
+  admin
+  web_test
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+  tool
+}
+
+enum AuditActorType {
+  admin
+  agent
+  system
+}
+
+model Court {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String               @db.VarChar(100)
+  nameAr       String               @map("name_ar") @db.VarChar(100)
+  type         CourtType
+  surface      SurfaceType
+  capacity     Int
+  hourlyRate   Decimal              @map("hourly_rate") @db.Decimal(10, 2)
+  peakRate     Decimal              @map("peak_rate") @db.Decimal(10, 2)
+  googleCalId  String?              @map("google_cal_id") @db.VarChar(255)
+  locationLat  Decimal?             @map("location_lat") @db.Decimal(10, 8)
+  locationLng  Decimal?             @map("location_lng") @db.Decimal(11, 8)
+  mapsLink     String?              @map("maps_link")
+  isActive     Boolean              @default(true) @map("is_active")
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  bookings     Booking[]
+  pricingRules PricingRule[]
+  blocks       CourtUnavailability[]
+
+  @@index([isActive])
+  @@index([type])
+  @@map("courts")
+}
+
+model Customer {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone         String          @unique @db.VarChar(20)
+  name          String?         @db.VarChar(200)
+  email         String?         @db.VarChar(255)
+  preferredLang Language        @default(ar) @map("preferred_lang")
+  segment       CustomerSegment @default(new)
+  totalBookings Int             @default(0) @map("total_bookings")
+  totalSpent    Decimal         @default(0) @map("total_spent") @db.Decimal(10, 2)
+  firstContact  DateTime        @default(now()) @map("first_contact") @db.Timestamptz
+  lastContact   DateTime        @default(now()) @map("last_contact") @db.Timestamptz
+  preferences   Json            @default("{}")
+  notes         String?
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+  bookings      Booking[]
+  conversations Conversation[]
+
+  @@index([segment])
+  @@map("customers")
+}
+
+model Booking {
+  id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId              String        @map("customer_id") @db.Uuid
+  courtId                 String        @map("court_id") @db.Uuid
+  createdByConversationId String?       @map("created_by_conversation_id") @db.Uuid
+  bookingType             BookingType   @default(regular) @map("booking_type")
+  source                  BookingSource @default(agent)
+  status                  BookingStatus @default(confirmed)
+  startTime               DateTime      @map("start_time") @db.Timestamptz
+  endTime                 DateTime      @map("end_time") @db.Timestamptz
+  durationMins            Int           @map("duration_mins")
+  price                   Decimal       @db.Decimal(10, 2)
+  discount                Decimal       @default(0) @db.Decimal(10, 2)
+  cancelReason            String?       @map("cancel_reason")
+  cancelledAt             DateTime?     @map("cancelled_at") @db.Timestamptz
+  confirmedAt             DateTime?     @map("confirmed_at") @db.Timestamptz
+  cancelToken             String?       @unique @map("cancel_token") @db.VarChar(255)
+  modifyToken             String?       @unique @map("modify_token") @db.VarChar(255)
+  customer                Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  court                   Court         @relation(fields: [courtId], references: [id], onDelete: Restrict)
+  eventExtras             EventExtra?
+  conversation            Conversation? @relation(fields: [createdByConversationId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([courtId])
+  @@index([status])
+  @@index([courtId, startTime, endTime])
+  @@map("bookings")
+}
+
+model EventPackage {
+  id                  String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                String       @db.VarChar(100)
+  nameAr              String       @map("name_ar") @db.VarChar(100)
+  type                EventType
+  description         String?
+  descriptionAr       String?      @map("description_ar")
+  basePrice           Decimal      @map("base_price") @db.Decimal(10, 2)
+  maxGuests           Int?         @map("max_guests")
+  includesDecorations Boolean      @default(false) @map("includes_decorations")
+  includesCatering    Boolean      @default(false) @map("includes_catering")
+  durationMins        Int          @map("duration_mins")
+  isActive            Boolean      @default(true) @map("is_active")
+  createdAt           DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  eventExtras         EventExtra[]
+
+  @@index([type])
+  @@index([isActive])
+  @@map("event_packages")
+}
+
+model EventExtra {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bookingId       String        @unique @map("booking_id") @db.Uuid
+  packageId       String?       @map("package_id") @db.Uuid
+  eventType       EventType     @map("event_type")
+  guestCount      Int?          @map("guest_count")
+  decorations     Boolean       @default(false)
+  catering        Boolean       @default(false)
+  specialRequests String?       @map("special_requests")
+  packageName     String?       @map("package_name") @db.VarChar(100)
+  packagePrice    Decimal?      @map("package_price") @db.Decimal(10, 2)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  booking         Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  package         EventPackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  @@index([packageId])
+  @@map("event_extras")
+}
+
+model PricingRule {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courtId    String?   @map("court_id") @db.Uuid
+  name       String    @db.VarChar(100)
+  priority   Int       @default(100)
+  dayOfWeek  Int?      @map("day_of_week")
+  startHour  Int       @map("start_hour")
+  endHour    Int       @map("end_hour")
+  price      Decimal   @db.Decimal(10, 2)
+  isPeak     Boolean   @default(false) @map("is_peak")
+  isActive   Boolean   @default(true) @map("is_active")
+  validFrom  DateTime? @map("valid_from") @db.Date
+  validUntil DateTime? @map("valid_until") @db.Date
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  court      Court?    @relation(fields: [courtId], references: [id], onDelete: Cascade)
+
+  @@index([courtId])
+  @@index([dayOfWeek])
+  @@map("pricing_rules")
+}
+
+model Conversation {
+  id            String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId    String?               @map("customer_id") @db.Uuid
+  channel       Channel
+  status        ConversationStatus    @default(active)
+  intent        Intent?
+  summary       String?
+  resolved      Boolean               @default(false)
+  startedAt     DateTime              @default(now()) @map("started_at") @db.Timestamptz
+  lastMessageAt DateTime?             @map("last_message_at") @db.Timestamptz
+  endedAt       DateTime?             @map("ended_at") @db.Timestamptz
+  customer      Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  booking       Booking[]
+  messages      ConversationMessage[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([channel])
+  @@map("conversations")
+}
+
+model AdminUser {
+  id           String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email        String                @unique @db.VarChar(255)
+  passwordHash String                @map("password_hash") @db.VarChar(255)
+  name         String                @db.VarChar(200)
+  role         AdminRole             @default(staff)
+  isActive     Boolean               @default(true) @map("is_active")
+  createdAt    DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  blocks       CourtUnavailability[]
+
+  @@index([role])
+  @@map("admin_users")
+}
+
+model BookingPolicy {
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  timezone               String   @default("Asia/Amman") @db.VarChar(100)
+  slotIntervalMins       Int      @default(60) @map("slot_interval_mins")
+  minBookingDurationMins Int      @default(60) @map("min_booking_duration_mins")
+  maxBookingDurationMins Int      @default(180) @map("max_booking_duration_mins")
+  minLeadTimeMins        Int      @default(60) @map("min_lead_time_mins")
+  cancellationCutoffMins Int      @default(180) @map("cancellation_cutoff_mins")
+  modificationCutoffMins Int      @default(180) @map("modification_cutoff_mins")
+  openingTime            String   @default("09:00") @map("opening_time") @db.VarChar(10)
+  closingTime            String   @default("23:00") @map("closing_time") @db.VarChar(10)
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("booking_policies")
+}
+
+model CourtUnavailability {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courtId          String?    @map("court_id") @db.Uuid
+  createdByAdminId String?    @map("created_by_admin_id") @db.Uuid
+  reason           String     @db.VarChar(255)
+  startTime        DateTime   @map("start_time") @db.Timestamptz
+  endTime          DateTime   @map("end_time") @db.Timestamptz
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  court            Court?     @relation(fields: [courtId], references: [id], onDelete: Cascade)
+  createdByAdmin   AdminUser? @relation(fields: [createdByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([courtId])
+  @@map("court_unavailability")
+}
+
+model ConversationMessage {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  role           MessageRole
+  content        String
+  contentJson    Json?        @map("content_json")
+  toolName       String?      @map("tool_name") @db.VarChar(120)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@map("conversation_messages")
+}
+
+model AuditLog {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorType  AuditActorType @map("actor_type")
+  actorId    String?        @map("actor_id") @db.Uuid
+  entityType String         @map("entity_type") @db.VarChar(120)
+  entityId   String         @map("entity_id") @db.Uuid
+  action     String         @db.VarChar(120)
+  beforeJson Json?          @map("before_json")
+  afterJson  Json?          @map("after_json")
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}

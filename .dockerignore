@@ -1,0 +1,10 @@
+node_modules
+.next
+apps/api/dist
+apps/agent/__pycache__
+apps/agent/.venv
+*.pyc
+.env
+.env.local
+.git
+.claude
