@@ -45,6 +45,7 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       BACKEND_API_URL: http://api:4000/api
       AGENT_PORT: "8000"
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     depends_on:
       - api
 

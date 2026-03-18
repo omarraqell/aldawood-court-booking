@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
 import { CustomersService } from "./customers.service";
 
 @Controller("customers")
@@ -23,5 +23,10 @@ export class CustomersController {
   @Post("find-or-create")
   findOrCreate(@Body() body: { phone: string; name?: string; preferredLang?: string }) {
     return this.customersService.findOrCreate(body);
+  }
+
+  @Patch(":id")
+  updateCustomer(@Param("id") id: string, @Body() body: { name?: string; phone?: string; email?: string }) {
+    return this.customersService.update(id, body);
   }
 }

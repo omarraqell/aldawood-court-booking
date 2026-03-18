@@ -240,6 +240,43 @@ async def get_booking_summary(booking_id: str) -> dict:
         return {"error": str(e)}
 
 
+@tool
+async def update_customer(
+    name: Optional[str] = None,
+    phone: Optional[str] = None,
+    email: Optional[str] = None,
+) -> dict:
+    """Update the current customer's profile information (name, phone number, or email).
+
+    Use this when a customer provides their name or real phone number for the first time,
+    or wants to update their contact details.
+
+    Args:
+        name: Customer's full name.
+        phone: Customer's real phone number (e.g. +962791234567).
+        email: Customer's email address.
+    """
+    customer_id = _customer_id.get()
+    if not customer_id:
+        return {"error": "No customer ID available. The customer profile has not been created yet."}
+
+    payload: dict = {}
+    if name:
+        payload["name"] = name
+    if phone:
+        payload["phone"] = phone
+    if email:
+        payload["email"] = email
+
+    if not payload:
+        return {"error": "No fields to update. Provide at least one of: name, phone, email."}
+
+    try:
+        return await backend_client.patch(f"/customers/{customer_id}", payload)
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # List of tools to give the LLM
 agent_tools = [
     check_availability,
@@ -248,4 +285,5 @@ agent_tools = [
     modify_booking,
     cancel_booking,
     get_booking_summary,
+    update_customer,
 ]

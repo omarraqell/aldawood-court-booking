@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import traceback
 import sys
 
@@ -25,12 +27,36 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 import os
 
 from app.schemas.chat import ChatRequest
 from app.services.agent_service import agent_service
+from app.telegram_bot import create_telegram_app
 
-app = FastAPI(title="Aldawood Booking Agent", version="0.2.0")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+telegram_app = create_telegram_app()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start Telegram bot polling on startup, stop on shutdown."""
+    if telegram_app:
+        await telegram_app.initialize()
+        await telegram_app.start()
+        await telegram_app.updater.start_polling()
+        logger.info("Telegram bot started polling.")
+    yield
+    if telegram_app:
+        await telegram_app.updater.stop()
+        await telegram_app.stop()
+        await telegram_app.shutdown()
+        logger.info("Telegram bot stopped.")
+
+
+app = FastAPI(title="Aldawood Booking Agent", version="0.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

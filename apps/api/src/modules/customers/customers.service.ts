@@ -50,6 +50,25 @@ export class CustomersService {
     return serialize(customer);
   }
 
+  async update(id: string, payload: { name?: string; phone?: string; email?: string }) {
+    const customer = await this.prisma.customer.findUnique({ where: { id } });
+    if (!customer) {
+      throw new NotFoundException(`Customer ${id} not found.`);
+    }
+
+    const data: Record<string, unknown> = { lastContact: new Date() };
+    if (payload.name) data.name = payload.name;
+    if (payload.phone) data.phone = payload.phone;
+    if (payload.email) data.email = payload.email;
+
+    const updated = await this.prisma.customer.update({
+      where: { id },
+      data,
+    });
+
+    return serialize(updated);
+  }
+
   async findOrCreate(payload: { phone: string; name?: string; preferredLang?: string }) {
     const phone = payload.phone.trim();
 

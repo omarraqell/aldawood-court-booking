@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     openai_model: str = Field(default="gpt-5-mini", alias="OPENAI_MODEL")
     backend_api_url: str = Field(default="http://localhost:4000/api", alias="BACKEND_API_URL")
     agent_port: int = Field(default=8000, alias="AGENT_PORT")
+    telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
 
 
 settings = Settings()
