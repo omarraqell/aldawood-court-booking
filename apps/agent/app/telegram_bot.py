@@ -1,6 +1,6 @@
 """
 Telegram bot integration for the Aldawood Court Booking Agent.
-Receives messages from Telegram users and forwards them to the agent service.
+Uses webhook mode (not polling) to avoid 409 conflicts during deployments.
 """
 
 import logging
