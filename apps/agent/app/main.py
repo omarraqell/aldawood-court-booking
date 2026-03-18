@@ -23,7 +23,9 @@ if sys.version_info >= (3, 14):
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+import os
 
 from app.schemas.chat import ChatRequest
 from app.services.agent_service import agent_service
@@ -37,6 +39,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/")
+async def test_ui():
+    ui_path = os.path.join(os.path.dirname(__file__), "..", "test-ui.html")
+    return FileResponse(ui_path)
 
 
 @app.get("/health")

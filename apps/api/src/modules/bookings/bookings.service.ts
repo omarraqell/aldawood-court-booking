@@ -48,6 +48,7 @@ export class BookingsService {
     }
 
     const [items, total] = await this.prisma.$transaction([
+      this.prisma.booking.findMany({
         where,
         include: {
           customer: true,

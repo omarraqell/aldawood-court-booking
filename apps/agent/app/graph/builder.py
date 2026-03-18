@@ -20,7 +20,7 @@ def prompt_fn(state: dict) -> list:
 llm = ChatOpenAI(
     api_key=settings.openai_api_key,
     model=settings.openai_model,
-    temperature=0,
+    temperature=1,
 )
 
 graph = create_react_agent(
