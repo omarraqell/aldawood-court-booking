@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
     if telegram_app:
         await telegram_app.initialize()
         await telegram_app.start()
-        await telegram_app.updater.start_polling()
+        await telegram_app.updater.start_polling(drop_pending_updates=True)
         logger.info("Telegram bot started polling.")
     yield
     if telegram_app:
