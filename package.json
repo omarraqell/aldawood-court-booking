@@ -1,0 +1,20 @@
+{
+  "name": "aldawood-court-booking",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace @aldawood/api run start:dev",
+    "dev:agent": "python -m uvicorn app.main:app --reload --app-dir apps/agent",
+    "dev:admin": "npm --workspace @aldawood/admin-web run dev",
+    "build:api": "npm --workspace @aldawood/api run build",
+    "build:admin": "npm --workspace @aldawood/admin-web run build",
+    "build": "npm run build:api && npm run build:admin",
+    "lint:api": "npm --workspace @aldawood/api run lint",
+    "lint:admin": "npm --workspace @aldawood/admin-web run lint",
+    "lint": "npm run lint:api && npm run lint:admin"
+  }
+}
