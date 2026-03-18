@@ -14,53 +14,49 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const session = await getAdminSession();
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body>
-        <a href="#main-content" className="skip-link">
-          Skip to main content
-        </a>
-        <div className="app-shell">
-          {session ? (
+      <body suppressHydrationWarning>
+        {session ? (
+          <div className="app-shell">
             <aside className="shell-aside">
-              <div className="shell-brand panel">
-                <p className="eyebrow">Aldawood Courts</p>
-                <h1>Operations Desk</h1>
-                <p className="muted">
-                  Live booking control, agent visibility, pricing rules, and venue operations.
-                </p>
-              </div>
+              <div className="sidebar-logo" style={{ background: 'var(--accent)', color: 'black' }}>A</div>
               <ShellNav />
+              <div style={{ marginTop: 'auto' }}>
+              </div>
             </aside>
-          ) : null}
-          <div className="shell-content">
-            <main id="main-content">
-              {session ? (
-                <header className="shell-header panel">
-                  <div>
-                    <p className="eyebrow">Signed in</p>
-                    <strong>{session.admin.name}</strong>
-                    <p className="muted">
-                      {session.admin.email} · {session.admin.role}
-                    </p>
+            <div className="shell-content">
+              <header className="shell-header">
+                <div className="header-right">
+                  <div className="profile-trigger">
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>{session.admin.name}</div>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>@{session.admin.role}</div>
+                    </div>
+            <div className="profile-avatar" style={{ display: 'flex', alignItems: 'center', justifySelf: 'center', background: 'var(--surface-raised)', fontSize: '10px', border: '1px solid var(--accent)' }}>
+              <img src={`https://ui-avatars.com/api/?name=${session.admin.name}&background=00ab96&color=fff`} className="profile-avatar" alt="" />
+            </div>
                   </div>
-                  <div className="shell-header__actions">
-                    <span className="shell-status-pill">Live operations mode</span>
-                    <form action={logoutAction}>
-                      <button type="submit" className="agent-secondary-button">
-                        Sign out
-                      </button>
-                    </form>
-                  </div>
-                </header>
-              ) : null}
-              {children}
-            </main>
+                  <form action={logoutAction}>
+                    <button type="submit" className="nav-pill" style={{ border: 'none', cursor: 'pointer', background: 'none' }}>
+                      Sign out
+                    </button>
+                  </form>
+                </div>
+              </header>
+              <main id="main-content">
+                {children}
+              </main>
+            </div>
           </div>
-        </div>
+        ) : (
+          <main id="main-content">
+            {children}
+          </main>
+        )}
       </body>
     </html>
   );

@@ -1,4 +1,25 @@
 import traceback
+import sys
+
+# Workaround for Pydantic v1 incompatibility with Python 3.14
+if sys.version_info >= (3, 14):
+    real_version_info = sys.version_info
+    class MockVersionInfo(tuple):
+        @property
+        def major(self): return 3
+        @property
+        def minor(self): return 13
+        @property
+        def micro(self): return 0
+        @property
+        def releaselevel(self): return "final"
+        @property
+        def serial(self): return 0
+        def __ge__(self, other):
+            if isinstance(other, tuple) and len(other) >= 2 and other[0] == 3 and other[1] == 14:
+                return False
+            return real_version_info >= other
+    sys.version_info = MockVersionInfo((3, 13, 0, "final", 0))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

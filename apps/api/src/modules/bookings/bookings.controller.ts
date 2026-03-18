@@ -7,7 +7,7 @@ export class BookingsController {
   constructor(private readonly bookingsService: BookingsService) {}
 
   @Get()
-  listBookings(@Query() query: PaginationQueryDto) {
+  listBookings(@Query() query: PaginationQueryDto & { courtId?: string; date?: string }) {
     return this.bookingsService.list(query);
   }
 

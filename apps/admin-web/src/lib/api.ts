@@ -243,8 +243,17 @@ async function apiSafeGet<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
-export function getBookings() {
-  return apiSafeGet<BookingListResponse>("/bookings", {
+export function getBookings(params: { page?: number; limit?: number; courtId?: string; date?: string } = {}) {
+  const query = new URLSearchParams();
+  if (params.page) query.set("page", params.page.toString());
+  if (params.limit) query.set("limit", params.limit.toString());
+  if (params.courtId) query.set("courtId", params.courtId);
+  if (params.date) query.set("date", params.date);
+
+  const queryString = query.toString();
+  const path = `/bookings${queryString ? `?${queryString}` : ""}`;
+
+  return apiSafeGet<BookingListResponse>(path, {
     items: [],
     pagination: { page: 1, limit: 20, total: 0, totalPages: 0 }
   });
@@ -268,6 +277,10 @@ export function getCourts() {
   return apiSafeGet<CourtListResponse>("/courts", {
     items: []
   });
+}
+
+export function getCourt(id: string) {
+  return apiSafeGet<Court | null>(`/courts/${id}`, null);
 }
 
 export function getPolicies() {

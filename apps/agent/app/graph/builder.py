@@ -26,5 +26,5 @@ llm = ChatOpenAI(
 graph = create_react_agent(
     model=llm,
     tools=agent_tools,
-    prompt=prompt_fn,
+    state_modifier=prompt_fn,
 )

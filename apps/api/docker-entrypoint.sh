@@ -6,7 +6,7 @@ cd /app/apps/api
 npx prisma migrate deploy
 
 echo "Seeding database..."
-npx ts-node prisma/seed.ts || echo "Seed skipped (may already exist)"
+npx ts-node prisma/seed.ts
 
 echo "Starting API server..."
 cd /app

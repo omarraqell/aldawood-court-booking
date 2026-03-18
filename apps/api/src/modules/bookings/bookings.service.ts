@@ -26,12 +26,29 @@ export class BookingsService {
     private readonly policiesService: PoliciesService
   ) {}
 
-  async list(query: PaginationQueryDto) {
+  async list(query: PaginationQueryDto & { courtId?: string; date?: string }) {
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 20, 100);
+    const courtId = query.courtId;
+    const date = query.date;
+
+    const where: Prisma.BookingWhereInput = {};
+    if (courtId) {
+      where.courtId = courtId;
+    }
+    if (date) {
+      // Start from 00:00 of the selected date and extend to 04:00 of the next day
+      // to capture all potential schedule slots
+      const start = new Date(`${date}T00:00:00Z`);
+      const end = new Date(start.getTime() + 28 * 60 * 60 * 1000); // 24h + 4h
+      where.startTime = {
+        gte: start,
+        lte: end
+      };
+    }
 
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.booking.findMany({
+        where,
         include: {
           customer: true,
           court: true,
@@ -41,7 +58,7 @@ export class BookingsService {
         skip: (page - 1) * limit,
         take: limit
       }),
-      this.prisma.booking.count()
+      this.prisma.booking.count({ where })
     ]);
 
     return serialize({
