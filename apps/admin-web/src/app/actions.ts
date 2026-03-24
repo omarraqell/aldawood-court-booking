@@ -126,6 +126,79 @@ export async function createPricingRuleAction(formData: FormData) {
   revalidatePath("/courts");
 }
 
+export async function createBookingAction(formData: FormData): Promise<{ error?: string; bookingId?: string }> {
+  const session = await requireSession();
+
+  const rawStart = String(formData.get("startTime") ?? "");
+  const startTime = rawStart.includes("+") || rawStart.includes("Z")
+    ? rawStart
+    : `${rawStart}:00+03:00`;
+
+  const durationMins = Number(formData.get("durationMins") ?? 60);
+  const startDate = new Date(startTime);
+  const endDate = new Date(startDate.getTime() + durationMins * 60_000);
+  const endTime = endDate.toISOString();
+
+  // Extract date from startTime for the API
+  const date = startTime.slice(0, 10);
+
+  try {
+    const res = await apiRequest("/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        actorAdminId: session.admin.id,
+        customerId: formData.get("customerId") ? String(formData.get("customerId")) : undefined,
+        phone: String(formData.get("phone") ?? ""),
+        customerName: String(formData.get("customerName") ?? "") || undefined,
+        courtId: String(formData.get("courtId") ?? ""),
+        date,
+        startTime,
+        endTime,
+        durationMins,
+        bookingType: String(formData.get("bookingType") ?? "regular"),
+        source: "admin"
+      })
+    });
+    const booking = await res.json();
+
+    revalidatePath("/bookings");
+    revalidatePath("/");
+    return { bookingId: booking.id };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Booking creation failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+}
+
+export async function checkAvailabilityAction(formData: FormData): Promise<{ error?: string; available?: boolean; options?: Array<{ courtId: string; courtName: string; price: number }> }> {
+  await requireSession();
+
+  const rawStart = String(formData.get("startTime") ?? "");
+  const startTime = rawStart.includes("+") || rawStart.includes("Z")
+    ? rawStart
+    : `${rawStart}:00+03:00`;
+
+  const durationMins = Number(formData.get("durationMins") ?? 60);
+  const date = startTime.slice(0, 10);
+
+  try {
+    const res = await apiRequest("/bookings/check-availability", {
+      method: "POST",
+      body: JSON.stringify({
+        courtId: formData.get("courtId") ? String(formData.get("courtId")) : undefined,
+        date,
+        startTime,
+        durationMins
+      })
+    });
+    const data = await res.json();
+    return { available: data.available, options: data.options };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Availability check failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+}
+
 export async function cancelBookingAction(formData: FormData) {
   const session = await requireSession();
   const bookingId = String(formData.get("bookingId") ?? "");

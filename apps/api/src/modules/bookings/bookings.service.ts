@@ -601,7 +601,9 @@ export class BookingsService {
   private async resolveCustomerId(payload: Record<string, unknown>) {
     const customerId = this.asString(payload.customerId);
     if (customerId) {
-      return customerId;
+      const exists = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } });
+      if (exists) return customerId;
+      // Customer may have been merged — fall through to phone-based resolution
     }
 
     const phone = this.asString(payload.phone);

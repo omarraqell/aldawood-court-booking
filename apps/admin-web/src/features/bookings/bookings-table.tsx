@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getBookings } from "@/lib/api";
+import { getBookings, getCourts, getCustomers } from "@/lib/api";
 import {
   badgeTone,
   bookingStatusLabel,
@@ -7,9 +7,14 @@ import {
   formatCurrency,
   formatDateTime
 } from "@/lib/format";
+import { BookingsHeader } from "./bookings-header";
 
 export async function BookingsTable() {
-  const response = await getBookings();
+  const [response, courtsResponse, customersResponse] = await Promise.all([
+    getBookings(),
+    getCourts(),
+    getCustomers()
+  ]);
   const bookings = response.items;
   const confirmedCount = bookings.filter((booking) => booking.status === "confirmed").length;
   const cancelledCount = bookings.filter((booking) => booking.status === "cancelled").length;
@@ -31,6 +36,8 @@ export async function BookingsTable() {
           <span>{packageCount} package bookings</span>
         </div>
       </section>
+
+      <BookingsHeader courts={courtsResponse.items} customers={customersResponse.items} />
 
       <section className="panel">
         <table className="table">
