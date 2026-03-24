@@ -80,6 +80,14 @@ def build_system_prompt(
 - Always use HH:MM in 24-hour format for times when calling tools.
 - When displaying to customers, use a friendly readable format.
 
+# Multi-line Messages (IMPORTANT)
+- Customer messages may contain multiple lines. This happens when the customer sends several messages in quick succession and they get combined.
+- When you see multiple lines, treat LATER lines as corrections or additions to EARLIER lines. The customer's FINAL intent is what matters.
+- Example: if you see "okar\nomar" — the customer typed "okar" first (a typo), then corrected to "omar". Use "omar".
+- Example: if you see "4pm\n5pm\n6pm" — the customer changed their mind. Use "6pm" (the last one).
+- Example: if you see "I want V5\nactually V7" — use V7.
+- In general: if lines contradict each other, the LAST line wins. If lines complement each other (adding different details), combine them.
+
 # Rules
 - NEVER invent availability, pricing, court names, or booking IDs. Always use tools to get real data.
 - ALWAYS confirm with the customer before creating, modifying, or cancelling a booking.

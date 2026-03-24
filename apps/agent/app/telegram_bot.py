@@ -1,8 +1,10 @@
 """
 Telegram bot integration for the Aldawood Court Booking Agent.
 Uses webhook mode (not polling) to avoid 409 conflicts during deployments.
+Debounces rapid-fire messages so the agent sees one consolidated turn.
 """
 
+import asyncio
 import logging
 from telegram import Update
 from telegram.ext import (
@@ -18,8 +20,14 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Store conversation IDs per Telegram chat
+# Per-chat state
 _conversations: dict[int, str] = {}
+
+# Debounce: buffer of pending messages and their timer tasks
+DEBOUNCE_SECONDS = 3.0
+_pending_messages: dict[int, list[str]] = {}
+_debounce_tasks: dict[int, asyncio.Task] = {}
+_pending_updates: dict[int, Update] = {}
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -42,29 +50,31 @@ async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Conversation reset. Send a new message to start fresh!")
 
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Forward user messages to the agent and reply with the result."""
-    chat_id = update.effective_chat.id
-    user_message = update.message.text
+async def _flush_messages(chat_id: int):
+    """Wait for the debounce window, then process all buffered messages as one."""
+    await asyncio.sleep(DEBOUNCE_SECONDS)
 
-    if not user_message:
+    # Grab and clear the buffer
+    messages = _pending_messages.pop(chat_id, [])
+    update = _pending_updates.pop(chat_id, None)
+    _debounce_tasks.pop(chat_id, None)
+
+    if not messages or not update:
         return
 
-    # Use Telegram chat ID as the phone identifier
+    combined = "\n".join(messages)
     phone = f"tg_{chat_id}"
     conversation_id = _conversations.get(chat_id, "")
 
-    # Show typing indicator
     await update.effective_chat.send_action("typing")
 
     try:
         result = await agent_service.run(
-            message=user_message,
+            message=combined,
             phone=phone,
             conversation_id=conversation_id,
         )
 
-        # Store conversation ID for future messages
         conv_id = result.get("conversationId", "")
         if conv_id:
             _conversations[chat_id] = conv_id
@@ -78,6 +88,28 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "عذرا، حدث خطأ. حاول مرة أخرى.\n"
             "Sorry, an error occurred. Please try again."
         )
+
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Buffer user messages and debounce — only process after a pause."""
+    chat_id = update.effective_chat.id
+    user_message = update.message.text
+
+    if not user_message:
+        return
+
+    # Add message to buffer
+    if chat_id not in _pending_messages:
+        _pending_messages[chat_id] = []
+    _pending_messages[chat_id].append(user_message)
+    _pending_updates[chat_id] = update  # Keep latest update for replying
+
+    # Cancel existing timer and start a new one
+    existing_task = _debounce_tasks.get(chat_id)
+    if existing_task and not existing_task.done():
+        existing_task.cancel()
+
+    _debounce_tasks[chat_id] = asyncio.create_task(_flush_messages(chat_id))
 
 
 def create_telegram_app() -> Application | None:
