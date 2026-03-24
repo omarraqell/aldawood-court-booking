@@ -157,23 +157,238 @@ export async function confirmBookingAction(formData: FormData) {
   revalidatePath("/");
 }
 
-export async function rescheduleBookingAction(formData: FormData) {
+export async function rescheduleBookingAction(formData: FormData): Promise<{ error?: string }> {
   const session = await requireSession();
   const bookingId = String(formData.get("bookingId") ?? "");
+  const rawStart = String(formData.get("startTime") ?? "");
+  const durationMins = Number(formData.get("durationMins") ?? 60);
 
-  await apiRequest(`/bookings/${bookingId}`, {
-    method: "PATCH",
-    body: JSON.stringify({
-      actorAdminId: session.admin.id,
-      courtId: String(formData.get("courtId") ?? ""),
-      startTime: String(formData.get("startTime") ?? ""),
-      durationMins: Number(formData.get("durationMins") ?? 60)
-    })
-  });
+  // datetime-local gives "2026-03-25T16:00" — append Amman offset (+03:00)
+  const startTime = rawStart.includes("+") || rawStart.includes("Z")
+    ? rawStart
+    : `${rawStart}:00+03:00`;
+
+  // Calculate endTime from startTime + duration so the backend doesn't inherit the old endTime
+  const startDate = new Date(startTime);
+  const endDate = new Date(startDate.getTime() + durationMins * 60_000);
+  const endTime = endDate.toISOString();
+
+  try {
+    await apiRequest(`/bookings/${bookingId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        actorAdminId: session.admin.id,
+        courtId: String(formData.get("courtId") ?? ""),
+        startTime,
+        endTime,
+        durationMins
+      })
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Reschedule failed";
+    try {
+      const parsed = JSON.parse(message);
+      return { error: parsed.message ?? message };
+    } catch {
+      return { error: message };
+    }
+  }
 
   revalidatePath(`/bookings/${bookingId}`);
   revalidatePath("/bookings");
   revalidatePath("/");
+  return {};
+}
+
+export async function createPackageAction(formData: FormData): Promise<{ error?: string }> {
+  await requireSession();
+
+  try {
+    await apiRequest("/event-packages", {
+      method: "POST",
+      body: JSON.stringify({
+        name: String(formData.get("name") ?? ""),
+        nameAr: String(formData.get("nameAr") ?? ""),
+        type: String(formData.get("type") ?? "private_event"),
+        description: String(formData.get("description") ?? "") || null,
+        descriptionAr: String(formData.get("descriptionAr") ?? "") || null,
+        basePrice: Number(formData.get("basePrice") ?? 0),
+        maxGuests: formData.get("maxGuests") ? Number(formData.get("maxGuests")) : null,
+        includesDecorations: formData.get("includesDecorations") === "on",
+        includesCatering: formData.get("includesCatering") === "on",
+        durationMins: Number(formData.get("durationMins") ?? 60),
+        isActive: true
+      })
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Create failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+
+  revalidatePath("/packages");
+  revalidatePath("/");
+  return {};
+}
+
+export async function updatePackageAction(formData: FormData): Promise<{ error?: string }> {
+  await requireSession();
+  const packageId = String(formData.get("packageId") ?? "");
+
+  try {
+    await apiRequest(`/event-packages/${packageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        name: String(formData.get("name") ?? ""),
+        nameAr: String(formData.get("nameAr") ?? ""),
+        type: String(formData.get("type") ?? "private_event"),
+        description: String(formData.get("description") ?? "") || null,
+        descriptionAr: String(formData.get("descriptionAr") ?? "") || null,
+        basePrice: Number(formData.get("basePrice") ?? 0),
+        maxGuests: formData.get("maxGuests") ? Number(formData.get("maxGuests")) : null,
+        includesDecorations: formData.get("includesDecorations") === "on",
+        includesCatering: formData.get("includesCatering") === "on",
+        durationMins: Number(formData.get("durationMins") ?? 60),
+        isActive: formData.get("isActive") === "on"
+      })
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Update failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+
+  revalidatePath("/packages");
+  revalidatePath("/");
+  return {};
+}
+
+export async function activatePackageAction(formData: FormData): Promise<{ error?: string }> {
+  await requireSession();
+  const packageId = String(formData.get("packageId") ?? "");
+
+  try {
+    await apiRequest(`/event-packages/${packageId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ isActive: true })
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Activation failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+
+  revalidatePath("/packages");
+  revalidatePath("/");
+  return {};
+}
+
+export async function deletePackageAction(formData: FormData): Promise<{ error?: string }> {
+  await requireSession();
+  const packageId = String(formData.get("packageId") ?? "");
+
+  try {
+    await apiRequest(`/event-packages/${packageId}`, {
+      method: "DELETE"
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Deactivation failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+
+  revalidatePath("/packages");
+  revalidatePath("/");
+  return {};
+}
+
+// ── Admin user actions ──
+
+export async function createAdminAction(formData: FormData): Promise<{ error?: string }> {
+  await requireSession();
+
+  try {
+    await apiRequest("/admins", {
+      method: "POST",
+      body: JSON.stringify({
+        name: String(formData.get("name") ?? ""),
+        email: String(formData.get("email") ?? ""),
+        password: String(formData.get("password") ?? ""),
+        role: String(formData.get("role") ?? "staff")
+      })
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Create failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+
+  revalidatePath("/admins");
+  revalidatePath("/");
+  return {};
+}
+
+export async function updateAdminAction(formData: FormData): Promise<{ error?: string }> {
+  await requireSession();
+  const adminId = String(formData.get("adminId") ?? "");
+
+  const payload: Record<string, unknown> = {
+    name: String(formData.get("name") ?? ""),
+    email: String(formData.get("email") ?? ""),
+    role: String(formData.get("role") ?? "staff"),
+    isActive: formData.get("isActive") === "on"
+  };
+
+  const password = String(formData.get("password") ?? "");
+  if (password.length > 0) {
+    payload.password = password;
+  }
+
+  try {
+    await apiRequest(`/admins/${adminId}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload)
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Update failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+
+  revalidatePath("/admins");
+  revalidatePath("/");
+  return {};
+}
+
+export async function deactivateAdminAction(formData: FormData): Promise<{ error?: string }> {
+  await requireSession();
+  const adminId = String(formData.get("adminId") ?? "");
+
+  try {
+    await apiRequest(`/admins/${adminId}`, {
+      method: "DELETE"
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Deactivation failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+
+  revalidatePath("/admins");
+  revalidatePath("/");
+  return {};
+}
+
+export async function activateAdminAction(formData: FormData): Promise<{ error?: string }> {
+  await requireSession();
+  const adminId = String(formData.get("adminId") ?? "");
+
+  try {
+    await apiRequest(`/admins/${adminId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ isActive: true })
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Activation failed";
+    try { return { error: JSON.parse(message).message ?? message }; } catch { return { error: message }; }
+  }
+
+  revalidatePath("/admins");
+  revalidatePath("/");
+  return {};
 }
 
 async function requireSession() {

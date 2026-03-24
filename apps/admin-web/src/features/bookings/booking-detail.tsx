@@ -1,8 +1,7 @@
 import Link from "next/link";
 import {
   cancelBookingAction,
-  confirmBookingAction,
-  rescheduleBookingAction
+  confirmBookingAction
 } from "@/app/actions";
 import { getBooking, getCourts } from "@/lib/api";
 import {
@@ -12,6 +11,7 @@ import {
   formatCurrency,
   formatDateTime
 } from "@/lib/format";
+import { RescheduleForm } from "./reschedule-form";
 
 export async function BookingDetail({ bookingId }: { bookingId: string }) {
   const [booking, courtsResponse] = await Promise.all([getBooking(bookingId), getCourts()]);
@@ -130,40 +130,14 @@ export async function BookingDetail({ bookingId }: { bookingId: string }) {
               <h2>Reschedule booking</h2>
             </div>
           </div>
-          <form action={rescheduleBookingAction} className="management-form">
-            <input type="hidden" name="bookingId" value={booking.id} />
-            <label className="agent-field">
-              <span>Start time</span>
-              <input
-                name="startTime"
-                type="datetime-local"
-                defaultValue={toDateTimeLocalValue(booking.startTime)}
-                required
-              />
-            </label>
-            <label className="agent-field">
-              <span>Duration (mins)</span>
-              <input
-                name="durationMins"
-                type="number"
-                min={60}
-                step={30}
-                defaultValue={booking.durationMins}
-                required
-              />
-            </label>
-            <label className="agent-field">
-              <span>Court</span>
-              <select name="courtId" defaultValue={booking.courtId}>
-                {courtsResponse.items.map((court) => (
-                  <option key={court.id} value={court.id}>
-                    {court.name} · {court.type}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="submit">Save reschedule</button>
-          </form>
+          <RescheduleForm
+            key={`${booking.courtId}-${booking.startTime}-${booking.durationMins}`}
+            bookingId={booking.id}
+            currentStart={booking.startTime}
+            currentDuration={booking.durationMins}
+            currentCourtId={booking.courtId}
+            courts={courtsResponse.items}
+          />
         </article>
 
         <article className="panel detail-panel">
@@ -199,8 +173,3 @@ export async function BookingDetail({ bookingId }: { bookingId: string }) {
   );
 }
 
-function toDateTimeLocalValue(value: string) {
-  const date = new Date(value);
-  const shifted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return shifted.toISOString().slice(0, 16);
-}

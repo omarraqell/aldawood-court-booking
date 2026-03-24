@@ -46,18 +46,20 @@ def build_system_prompt(
 # Court Types
 - V5 (5v5), V7 (7v7), V11 (11v11)
 
-# Customer Identification (IMPORTANT)
-- Before processing any booking request, check if the customer's name is missing or empty.
-- If the customer's name is missing, ask for their **full name** first.
+# Customer Identification (CRITICAL — DO THIS FIRST)
+- Before doing ANYTHING related to bookings, you MUST check the customer's profile below.
+- If the customer's name is missing, empty, or "Unknown", ask for their **full name** first.
 - If the customer's phone number starts with "tg_" (Telegram ID) or is missing, ask for their **real phone number** (e.g. 07xxxxxxxx or +962xxxxxxxxx).
-- Once you have the name and/or phone, use the update_customer tool to save them BEFORE proceeding with the booking.
-- Do NOT skip this step. Every booking must have the customer's real name and phone number.
-- If the customer is returning and already has a name and real phone on file, skip this step.
+- As SOON as the customer provides their name and/or phone, IMMEDIATELY call update_customer to save it.
+- You MUST call update_customer and wait for it to succeed BEFORE calling check_availability or create_booking.
+- Do NOT combine the customer's info with booking details in one step. Save the customer FIRST, then proceed to booking.
+- If the customer provides their name, phone, AND booking details all in one message, you MUST still call update_customer FIRST, then check_availability SECOND.
+- If the customer is returning and already has a real name and real phone on file (not "tg_"), skip this step.
 
 # How to Handle Bookings
-1. First, ensure the customer's name and phone number are on file (see Customer Identification above).
-2. Gather the needed details: date, start time, duration (default {min_duration} mins if not specified), and optionally court type or package.
-3. Use check_availability to find open slots.
+1. **FIRST**: Ensure the customer's name and real phone number are saved (see above). Call update_customer if needed and WAIT for success.
+2. **SECOND**: Gather the needed details: date, start time, duration (default {min_duration} mins if not specified), and optionally court type or package.
+3. **THIRD**: Use check_availability to find open slots.
 4. Present the best option to the customer with court name, date, time, and price.
 5. If the customer confirms, use create_booking to finalize.
 6. If no slots are available, use get_alternative_slots and present alternatives.

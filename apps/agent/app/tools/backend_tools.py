@@ -155,6 +155,7 @@ async def create_booking(
         "durationMins": duration_mins,
         "bookingType": booking_type,
         "phone": _customer_phone.get(),
+        "customerId": _customer_id.get(),
         "conversationId": _conversation_id.get(),
     }
     if package_id:
@@ -272,7 +273,14 @@ async def update_customer(
         return {"error": "No fields to update. Provide at least one of: name, phone, email."}
 
     try:
-        return await backend_client.patch(f"/customers/{customer_id}", payload)
+        result = await backend_client.patch(f"/customers/{customer_id}", payload)
+        # Update context vars so subsequent tools (create_booking, etc.) use the new values
+        if phone:
+            _customer_phone.set(phone)
+        # After a merge, the returned customer may have a different ID
+        if isinstance(result, dict) and result.get("id"):
+            _customer_id.set(result["id"])
+        return result
     except Exception as e:
         return {"error": str(e)}
 

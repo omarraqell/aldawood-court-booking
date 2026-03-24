@@ -36,8 +36,20 @@ export type Customer = {
   segment: "new" | "occasional" | "regular" | "vip";
   totalBookings: number;
   totalSpent: string;
+  firstContact: string;
+  lastContact: string;
+  notes: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type CustomerListResponse = {
+  items: Customer[];
+};
+
+export type CustomerDetail = Customer & {
+  bookings: Booking[];
+  conversations: Conversation[];
 };
 
 export type EventExtra = {
@@ -297,6 +309,16 @@ export function getAdmins() {
   return apiSafeGet<AdminListResponse>("/admins", {
     items: []
   });
+}
+
+export function getCustomers() {
+  return apiSafeGet<CustomerListResponse>("/customers", {
+    items: []
+  });
+}
+
+export function getCustomer(id: string) {
+  return apiSafeGet<CustomerDetail | null>(`/customers/${id}`, null);
 }
 
 export function getAuditLogs() {

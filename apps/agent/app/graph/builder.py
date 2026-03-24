@@ -21,7 +21,7 @@ llm = ChatOpenAI(
     api_key=settings.openai_api_key,
     model=settings.openai_model,
     temperature=1,
-)
+).bind_tools(agent_tools, parallel_tool_calls=False)
 
 graph = create_react_agent(
     model=llm,
