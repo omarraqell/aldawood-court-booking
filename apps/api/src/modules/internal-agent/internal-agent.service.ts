@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { BookingStatus } from "@prisma/client";
 import { PrismaService } from "../../common/prisma.service";
 import { serialize } from "../../common/serialize";
@@ -30,14 +30,32 @@ export class InternalAgentService {
 
     if (conversationId) {
       // Existing conversation — load it and use its customer (who may have updated their phone)
-      conversation = await this.conversationsService.get(conversationId);
+      try {
+        conversation = await this.conversationsService.get(conversationId);
+      } catch (error) {
+        if (error instanceof NotFoundException) {
+          // Conversation was deleted — start fresh
+          customer = await this.customersService.findOrCreate({ phone });
+          conversation = await this.conversationsService.create({
+            channel: "web_test",
+            customerId: (customer as any).id,
+            intent: payload.intent
+          });
+          return this.buildContextResponse(payload, customer, conversation);
+        }
+        throw error;
+      }
       const convCustomerId = (conversation as any).customerId ?? (conversation as any).customer?.id;
       if (convCustomerId) {
         try {
           customer = await this.customersService.get(convCustomerId);
-        } catch {
-          // Customer was deleted (e.g. after merge) — fall back to phone lookup
-          customer = await this.customersService.findOrCreate({ phone });
+        } catch (error) {
+          if (error instanceof NotFoundException) {
+            // Customer was deleted (e.g. after merge) — fall back to phone lookup
+            customer = await this.customersService.findOrCreate({ phone });
+          } else {
+            throw error;
+          }
         }
       } else {
         customer = await this.customersService.findOrCreate({ phone });
@@ -56,6 +74,14 @@ export class InternalAgentService {
       });
     }
 
+    return this.buildContextResponse(payload, customer, conversation);
+  }
+
+  private async buildContextResponse(
+    payload: Record<string, unknown>,
+    customer: Record<string, unknown>,
+    conversation: Record<string, unknown>
+  ) {
     const customerId = (customer as any).id;
 
     return {
