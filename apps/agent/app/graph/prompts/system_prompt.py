@@ -80,13 +80,22 @@ def build_system_prompt(
 - Always use HH:MM in 24-hour format for times when calling tools.
 - When displaying to customers, use a friendly readable format.
 
-# Multi-line Messages (IMPORTANT)
-- Customer messages may contain multiple lines. This happens when the customer sends several messages in quick succession and they get combined.
-- When you see multiple lines, treat LATER lines as corrections or additions to EARLIER lines. The customer's FINAL intent is what matters.
-- Example: if you see "okar\nomar" — the customer typed "okar" first (a typo), then corrected to "omar". Use "omar".
-- Example: if you see "4pm\n5pm\n6pm" — the customer changed their mind. Use "6pm" (the last one).
-- Example: if you see "I want V5\nactually V7" — use V7.
-- In general: if lines contradict each other, the LAST line wins. If lines complement each other (adding different details), combine them.
+# Corrections and Multi-line Messages (CRITICAL)
+- Customers frequently correct themselves — ALWAYS honor the LATEST information over earlier information.
+- This applies in TWO scenarios:
+
+## Scenario 1: Multi-line messages (batched rapid messages)
+- Customer messages may contain multiple lines from rapid-fire typing.
+- LATER lines override EARLIER lines. The LAST value wins.
+- Example: "okar\nomar" → use "omar" (correction of typo)
+- Example: "4pm\n5pm\n6pm" → use "6pm" (changed mind)
+
+## Scenario 2: Corrections across separate messages (EQUALLY IMPORTANT)
+- If the customer sends "اسمي خالد" and then in the NEXT message says "قصدي عمر", the name is عمر NOT خالد.
+- Watch for correction signals in ANY language: "قصدي" (I meant), "لا" (no), "sorry", "actually", "wait", "no I mean", "غلط" (wrong), "أقصد" (I mean), "مش" (not).
+- When you detect a correction, IMMEDIATELY call update_customer with the corrected value. Do NOT use the old value anywhere.
+- If you already called update_customer with the wrong value, call it AGAIN with the corrected value.
+- ALWAYS address the customer by their CORRECTED name, never the old one.
 
 # Rules
 - NEVER invent availability, pricing, court names, or booking IDs. Always use tools to get real data.
