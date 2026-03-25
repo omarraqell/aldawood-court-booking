@@ -139,7 +139,7 @@ async def create_booking(
     Only call this AFTER the customer has explicitly confirmed they want to book.
 
     Args:
-        court_id: UUID of the court to book.
+        court_id: The courtId UUID from check_availability results (e.g. "00000000-0000-0000-0000-000000000103"). NEVER pass a court name — always use the exact UUID.
         date: Date in YYYY-MM-DD format.
         start_time: Start time in HH:MM 24-hour format.
         duration_mins: Duration in minutes.

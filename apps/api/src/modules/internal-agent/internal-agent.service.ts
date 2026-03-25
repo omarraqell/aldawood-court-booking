@@ -22,20 +22,41 @@ export class InternalAgentService {
   async getContext(payload: Record<string, unknown>) {
     const phone =
       typeof payload.phone === "string" && payload.phone.length > 0 ? payload.phone : "unknown";
-    const customer = await this.customersService.findOrCreate({
-      phone,
-      name: typeof payload.customerName === "string" ? payload.customerName : undefined,
-      preferredLang: typeof payload.preferredLang === "string" ? payload.preferredLang : undefined
-    });
     const conversationId =
       typeof payload.conversationId === "string" ? payload.conversationId : undefined;
-    const conversation = conversationId
-      ? await this.conversationsService.get(conversationId)
-      : await this.conversationsService.create({
-          channel: "web_test",
-          customerId: customer.id,
-          intent: payload.intent
-        });
+
+    let customer: Record<string, unknown>;
+    let conversation: Record<string, unknown>;
+
+    if (conversationId) {
+      // Existing conversation — load it and use its customer (who may have updated their phone)
+      conversation = await this.conversationsService.get(conversationId);
+      const convCustomerId = (conversation as any).customerId ?? (conversation as any).customer?.id;
+      if (convCustomerId) {
+        try {
+          customer = await this.customersService.get(convCustomerId);
+        } catch {
+          // Customer was deleted (e.g. after merge) — fall back to phone lookup
+          customer = await this.customersService.findOrCreate({ phone });
+        }
+      } else {
+        customer = await this.customersService.findOrCreate({ phone });
+      }
+    } else {
+      // New conversation — find or create customer by phone
+      customer = await this.customersService.findOrCreate({
+        phone,
+        name: typeof payload.customerName === "string" ? payload.customerName : undefined,
+        preferredLang: typeof payload.preferredLang === "string" ? payload.preferredLang : undefined
+      });
+      conversation = await this.conversationsService.create({
+        channel: "web_test",
+        customerId: (customer as any).id,
+        intent: payload.intent
+      });
+    }
+
+    const customerId = (customer as any).id;
 
     return {
       payload,
@@ -45,7 +66,7 @@ export class InternalAgentService {
       activeBookings: serialize(
         await this.prisma.booking.findMany({
           where: {
-            customerId: customer.id,
+            customerId,
             status: BookingStatus.confirmed,
             startTime: {
               gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
