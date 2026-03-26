@@ -1,3 +1,6 @@
+"""Main agent service: runs the deterministic LangGraph pipeline."""
+import logging
+
 from langchain_core.messages import AIMessage, HumanMessage
 
 from app.graph.builder import graph
@@ -7,6 +10,8 @@ from app.tools.backend_tools import (
     set_tool_context,
     update_conversation,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AgentService:
@@ -23,7 +28,7 @@ class AgentService:
         conv_id = conversation_id or conversation.get("id", "")
         customer_id = customer.get("id", "")
 
-        # 2. Set context vars for tools
+        # 2. Set context vars for backend functions
         set_tool_context(conv_id, customer_id, phone)
 
         # 3. Persist user message
@@ -34,7 +39,7 @@ class AgentService:
         history = _build_history(conversation.get("messages", []) if isinstance(conversation, dict) else [])
         history.append(HumanMessage(content=message))
 
-        # 5. Run the ReAct agent
+        # 5. Run the deterministic graph: extract → route → execute → respond
         result = await graph.ainvoke({
             "messages": history,
             "conversation_id": conv_id,
@@ -43,15 +48,14 @@ class AgentService:
             "policies": policies,
             "packages": packages,
             "active_bookings": active_bookings,
-            "preferred_language": customer.get("preferredLang", "ar"),
+            "extracted_intent": "",
+            "extracted_data": {},
+            "execution_result": {},
         })
 
-        # 6. Extract the final assistant reply
-        reply = ""
-        for msg in reversed(result.get("messages", [])):
-            if isinstance(msg, AIMessage) and msg.content and not msg.tool_calls:
-                reply = msg.content
-                break
+        # 6. Get reply from graph state
+        execution_result = result.get("execution_result", {})
+        reply = execution_result.get("reply", "")
 
         # 7. Persist assistant reply
         if conv_id and reply:
@@ -78,7 +82,6 @@ def _build_history(messages: list[dict]) -> list:
             history.append(HumanMessage(content=content))
         elif role == "assistant":
             history.append(AIMessage(content=content))
-        # skip tool/system messages — the LLM doesn't need them
     return history
 
 

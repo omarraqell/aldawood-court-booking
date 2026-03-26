@@ -1,11 +1,14 @@
+"""Backend API functions called by the executor node.
+
+These are plain async functions (not LLM tools). The executor calls them
+directly based on the extracted intent — no LLM decides which to call.
+"""
 from contextvars import ContextVar
 from typing import Optional
 
-from langchain_core.tools import tool
-
 from app.clients.backend_client import backend_client
 
-# Context vars set before the ReAct loop runs — tools read these
+# Context vars set before the graph runs — functions read these
 _conversation_id: ContextVar[str] = ContextVar("conversation_id", default="")
 _customer_id: ContextVar[str] = ContextVar("customer_id", default="")
 _customer_phone: ContextVar[str] = ContextVar("customer_phone", default="")
@@ -18,7 +21,7 @@ def set_tool_context(conversation_id: str, customer_id: str, customer_phone: str
 
 
 # ---------------------------------------------------------------------------
-# Infrastructure helpers (NOT exposed to the LLM)
+# Infrastructure helpers
 # ---------------------------------------------------------------------------
 
 async def get_context(phone: str, conversation_id: str, intent: str | None = None) -> dict:
@@ -48,10 +51,9 @@ async def update_conversation(conversation_id: str, payload: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# LLM-callable tools
+# Backend functions (called by executor, NOT by LLM)
 # ---------------------------------------------------------------------------
 
-@tool
 async def check_availability(
     date: str,
     start_time: str,
@@ -60,18 +62,7 @@ async def check_availability(
     booking_type: str = "regular",
     package_id: Optional[str] = None,
 ) -> dict:
-    """Check if a court slot is available for a given date, time, and duration.
-
-    Args:
-        date: Date in YYYY-MM-DD format.
-        start_time: Start time in HH:MM 24-hour format.
-        duration_mins: Duration in minutes.
-        court_type: Optional court size filter — one of V5, V7, V11.
-        booking_type: One of regular, birthday, private_event.
-        package_id: Optional event package ID.
-
-    Returns available slots with courtId, courtName, startTime, price, etc.
-    """
+    """Check if a court slot is available for a given date, time, and duration."""
     payload = {
         "date": date,
         "startTime": start_time,
@@ -91,7 +82,6 @@ async def check_availability(
         return {"error": str(e)}
 
 
-@tool
 async def get_alternative_slots(
     date: str,
     start_time: str,
@@ -99,15 +89,7 @@ async def get_alternative_slots(
     court_type: Optional[str] = None,
     booking_type: str = "regular",
 ) -> dict:
-    """Find alternative available court slots when the requested time is not available.
-
-    Args:
-        date: Date in YYYY-MM-DD format.
-        start_time: Start time in HH:MM 24-hour format.
-        duration_mins: Duration in minutes.
-        court_type: Optional court size filter — one of V5, V7, V11.
-        booking_type: One of regular, birthday, private_event.
-    """
+    """Find alternative available court slots."""
     payload = {
         "date": date,
         "startTime": start_time,
@@ -123,7 +105,6 @@ async def get_alternative_slots(
         return {"error": str(e)}
 
 
-@tool
 async def create_booking(
     court_id: str,
     date: str,
@@ -134,20 +115,7 @@ async def create_booking(
     guest_count: Optional[int] = None,
     special_requests: Optional[str] = None,
 ) -> dict:
-    """Create and confirm a court booking.
-
-    Only call this AFTER the customer has explicitly confirmed they want to book.
-
-    Args:
-        court_id: The courtId UUID from check_availability results (e.g. "00000000-0000-0000-0000-000000000103"). NEVER pass a court name — always use the exact UUID.
-        date: Date in YYYY-MM-DD format.
-        start_time: Start time in HH:MM 24-hour format.
-        duration_mins: Duration in minutes.
-        booking_type: One of regular, birthday, private_event.
-        package_id: Optional event package UUID.
-        guest_count: Optional number of guests (for events).
-        special_requests: Optional special requests text.
-    """
+    """Create and confirm a court booking."""
     payload = {
         "courtId": court_id,
         "date": date,
@@ -171,23 +139,13 @@ async def create_booking(
         return {"error": str(e)}
 
 
-@tool
 async def modify_booking(
     booking_id: str,
     date: Optional[str] = None,
     start_time: Optional[str] = None,
     duration_mins: Optional[int] = None,
 ) -> dict:
-    """Modify an existing booking's date, time, or duration.
-
-    Only call this AFTER the customer has confirmed the modification.
-
-    Args:
-        booking_id: UUID of the booking to modify.
-        date: New date in YYYY-MM-DD format (optional).
-        start_time: New start time in HH:MM format (optional).
-        duration_mins: New duration in minutes (optional).
-    """
+    """Modify an existing booking's date, time, or duration."""
     payload: dict = {
         "bookingId": booking_id,
         "phone": _customer_phone.get(),
@@ -206,16 +164,8 @@ async def modify_booking(
         return {"error": str(e)}
 
 
-@tool
 async def cancel_booking(booking_id: str, reason: str = "") -> dict:
-    """Cancel an existing booking.
-
-    Only call this AFTER the customer has explicitly confirmed they want to cancel.
-
-    Args:
-        booking_id: UUID of the booking to cancel.
-        reason: Reason for cancellation.
-    """
+    """Cancel an existing booking."""
     payload = {
         "bookingId": booking_id,
         "reason": reason,
@@ -228,38 +178,23 @@ async def cancel_booking(booking_id: str, reason: str = "") -> dict:
         return {"error": str(e)}
 
 
-@tool
 async def get_booking_summary(booking_id: str) -> dict:
-    """Get full details of a specific booking including court name, time, price, and status.
-
-    Args:
-        booking_id: UUID of the booking.
-    """
+    """Get full details of a specific booking."""
     try:
         return await backend_client.get(f"/bookings/{booking_id}/summary")
     except Exception as e:
         return {"error": str(e)}
 
 
-@tool
 async def update_customer(
     name: Optional[str] = None,
     phone: Optional[str] = None,
     email: Optional[str] = None,
 ) -> dict:
-    """Update the current customer's profile information (name, phone number, or email).
-
-    Use this when a customer provides their name or real phone number for the first time,
-    or wants to update their contact details.
-
-    Args:
-        name: Customer's full name.
-        phone: Customer's real phone number (e.g. +962791234567).
-        email: Customer's email address.
-    """
+    """Update the current customer's profile information."""
     customer_id = _customer_id.get()
     if not customer_id:
-        return {"error": "No customer ID available. The customer profile has not been created yet."}
+        return {"error": "No customer ID available."}
 
     payload: dict = {}
     if name:
@@ -270,28 +205,14 @@ async def update_customer(
         payload["email"] = email
 
     if not payload:
-        return {"error": "No fields to update. Provide at least one of: name, phone, email."}
+        return {"error": "No fields to update."}
 
     try:
         result = await backend_client.patch(f"/customers/{customer_id}", payload)
-        # Update context vars so subsequent tools (create_booking, etc.) use the new values
         if phone:
             _customer_phone.set(phone)
-        # After a merge, the returned customer may have a different ID
         if isinstance(result, dict) and result.get("id"):
             _customer_id.set(result["id"])
         return result
     except Exception as e:
         return {"error": str(e)}
-
-
-# List of tools to give the LLM
-agent_tools = [
-    check_availability,
-    get_alternative_slots,
-    create_booking,
-    modify_booking,
-    cancel_booking,
-    get_booking_summary,
-    update_customer,
-]
