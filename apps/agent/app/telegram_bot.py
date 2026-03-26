@@ -98,6 +98,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_message:
         return
 
+    # If replying to a previous message, prepend the quoted text for context
+    if update.message.reply_to_message and update.message.reply_to_message.text:
+        quoted = update.message.reply_to_message.text
+        user_message = f'[ردًا على: "{quoted}"]\n{user_message}'
+
     # Add message to buffer
     if chat_id not in _pending_messages:
         _pending_messages[chat_id] = []

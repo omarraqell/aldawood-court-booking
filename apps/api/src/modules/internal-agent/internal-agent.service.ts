@@ -17,7 +17,7 @@ export class InternalAgentService {
     private readonly customersService: CustomersService,
     private readonly policiesService: PoliciesService,
     private readonly eventPackagesService: EventPackagesService
-  ) {}
+  ) { }
 
   async getContext(payload: Record<string, unknown>) {
     const phone =
