@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 _llm_kwargs = {
     "api_key": settings.openai_api_key,
     "model": settings.openai_model,
-    "temperature": 1,
 }
 if settings.openai_base_url:
     _llm_kwargs["base_url"] = settings.openai_base_url
@@ -234,25 +233,37 @@ async def execute_booking_node(state: AgentState) -> dict:
         )
         slots = avail.get("options", []) if isinstance(avail, dict) else []
 
+        # Filter by court_type if provided (e.g. "V5", "V7")
+        court_type = (data.get("court_type") or "").upper()
+        if court_type and slots:
+            typed = [s for s in slots if (s.get("courtType") or "").upper() == court_type]
+            if typed:
+                slots = typed
+
         # If only one option available, auto-select it
         if len(slots) == 1:
             court_id = slots[0].get("courtId")
-        elif court_pick and slots:
-            pick_clean = court_pick.replace("ملعب", "").replace("court", "").replace("احجز", "").strip()
+        elif slots:
+            if court_pick:
+                pick_clean = court_pick.replace("ملعب", "").replace("court", "").replace("احجز", "").strip()
 
-            for slot in slots:
-                court_name = (slot.get("courtName", "") or "").lower()
-                court_name_ar = (slot.get("courtNameAr", "") or "").lower()
-                if (court_pick in court_name or court_pick in court_name_ar
-                        or pick_clean in court_name or pick_clean in court_name_ar):
-                    court_id = slot.get("courtId")
-                    break
+                for slot in slots:
+                    court_name = (slot.get("courtName", "") or "").lower()
+                    court_name_ar = (slot.get("courtNameAr", "") or "").lower()
+                    if (court_pick in court_name or court_pick in court_name_ar
+                            or pick_clean in court_name or pick_clean in court_name_ar):
+                        court_id = slot.get("courtId")
+                        break
 
-            # Try by index (pick "1" = first slot, "2" = second)
-            if not court_id and pick_clean.isdigit():
-                idx = int(pick_clean) - 1
-                if 0 <= idx < len(slots):
-                    court_id = slots[idx].get("courtId")
+                # Try by index (pick "1" = first slot, "2" = second)
+                if not court_id and pick_clean.isdigit():
+                    idx = int(pick_clean) - 1
+                    if 0 <= idx < len(slots):
+                        court_id = slots[idx].get("courtId")
+
+            # Still no match but we have filtered slots — pick the first
+            if not court_id:
+                court_id = slots[0].get("courtId")
 
     if not court_id:
         court_pick = data.get("court_pick", "")
@@ -271,6 +282,19 @@ async def execute_booking_node(state: AgentState) -> dict:
         if not start_time:
             missing.append("start_time")
         return {"execution_result": {"action": "need_details", "results": {"missing": missing}, "error": None}}
+
+    # Prevent duplicate booking for the same date/time
+    active_bookings = state.get("active_bookings", [])
+    for ab in active_bookings:
+        ab_start = ab.get("startTime", "")
+        if date in ab_start and start_time in ab_start and ab.get("status") == "confirmed":
+            return {
+                "execution_result": {
+                    "action": "booking_created",
+                    "results": ab,
+                    "error": None,
+                }
+            }
 
     result = await create_booking(
         court_id=court_id,
@@ -377,7 +401,8 @@ async def respond_node(state: AgentState) -> dict:
 - If there's an error, explain it simply and suggest what to do.
 - Do NOT mention tools, intents, UUIDs, or technical details.
 - Do NOT call any functions or tools. You are a text-only responder. Just produce a plain text reply.
-- Keep responses concise and friendly."""
+- Keep responses concise and friendly.
+- LANGUAGE REMINDER: Reply in the SAME language as the customer's LAST message. English message → English reply (use "Aldawood"). Arabic message → Arabic reply (use "الداوود")."""
 
     messages = [SystemMessage(content=full_system)] + list(state.get("messages", []))
     response = await _response_llm.ainvoke(messages)
